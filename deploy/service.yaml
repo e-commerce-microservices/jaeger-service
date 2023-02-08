@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-conf
+  labels:
+    app: opentelemetry
+    component: otel-collector-conf
+data:
+  otel-collector-config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    exporters:
+      jaeger:
+        endpoint: jaeger-all-in-one:14250
+        tls:
+          insecure: true 
+      logging:
+    processors:
+      batch:
+      resource:
+        attributes:
+          - key: test.key
+            value: "test-value"
+            action: insert
+    extensions:
+      health_check:
+      zpages:
+        endpoint: :55679
+    service:
+      telemetry:
+        logs:
+          level: "debug"
+      extensions: [zpages, health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [logging, jaeger, otlp/aspecto]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  labels:
+    app: opentelemetry
+    component: otel-collector
+spec:
+  ports:
+    - name: otlp-grpc # Default endpoint for OpenTelemetry gRPC receiver.
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - name: otlp-http # Default endpoint for OpenTelemetry HTTP receiver.
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+    - name: zpages
+      port: 55679
+      protocol: TCP
+      targetPort: 55679
+    - name: health-check
+      port: 13133
+      protocol: TCP
+      targetPort: 13133
+    - name: jaeger
+      port: 16686
+      protocol: TCP
+      targetPort: 16686
+  type: LoadBalancer
+  selector:
+    component: otel-collector
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  labels:
+    app: opentelemetry
+    component: otel-collector
+spec:
+  selector:
+    matchLabels:
+      app: opentelemetry
+      component: otel-collector
+  minReadySeconds: 5
+  replicas: 1
+  template:
+    metadata:
+      namespace: opentelemetry
+      labels:
+        app: opentelemetry
+        component: otel-collector
+    spec:
+      containers:
+        - command:
+            - "/otelcol"
+            - "--config=/conf/otel-collector-config.yaml"
+          image: otel/opentelemetry-collector:latest
+          name: otel-collector
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+            requests:
+              cpu: 200m
+              memory: 400Mi
+          ports:
+            - containerPort: 4317 #otlp grpc
+            - containerPort: 4318 # otlp http
+            - containerPort: 55679 # zpages
+            - containerPort: 13133 # health check
+          volumeMounts:
+            - name: otel-collector-config-vol
+              mountPath: /conf
+      volumes:
+        - configMap:
+            name: otel-collector-conf
+            items:
+              - key: otel-collector-config
+                path: otel-collector-config.yaml
+          name: otel-collector-config-vol
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-all-in-one
+  labels:
+    app: opentelemetry
+    component: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opentelemetry
+      component: otel-collector
+  template:
+    metadata:
+      labels:
+        app: opentelemetry
+        component: otel-collector
+    spec:
+      containers:
+        - image: jaegertracing/all-in-one:latest
+          name: jaeger
+          ports:
+            - containerPort: 16686
+            - containerPort: 14250
+            - containerPort: 14268
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-all-in-one
+  labels:
+    app: opentelemetry
+    component: otel-collector
+spec:
+  type: NodePort
+  ports:
+    - name: collector
+      port: 14250
+      protocol: TCP
+      targetPort: 14250
+    - name: collector1
+      port: 14268
+      protocol: TCP
+      targetPort: 14268
+    - name: jaeger
+      port: 16686
+      protocol: TCP
+      targetPort: 16686
+      nodePort: 30100
+  selector:
+    app: opentelemetry
+    component: otel-collector
