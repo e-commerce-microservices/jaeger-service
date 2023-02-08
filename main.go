@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -24,9 +25,9 @@ func main() {
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
-	// ctx := context.Background()
-	// ctx, span := otel.Tracer("").Start(ctx, "Service.BrandSafety")
-	// defer span.End()
+	ctx := context.Background()
+	ctx, span := otel.Tracer("").Start(ctx, "Service.BrandSafety")
+	defer span.End()
 
 	r := gin.Default()
 	//gin OpenTelemetry instrumentation
@@ -46,8 +47,6 @@ func main() {
 func jaegerTraceProvider() (*sdktrace.TracerProvider, error) {
 
 	exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://jaeger-all-in-one:14268/api/traces")))
-	// exp, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint("http://192.168.49.2:32325/api/traces")))
-	// exp, err := jaeger.New(jaeger.WithAgentEndpoint(jaeger.WithAgentHost("10.3.68.12"), jaeger.WithAgentPort("6831")))
 	if err != nil {
 		log.Println("err: ", err)
 		return nil, err
