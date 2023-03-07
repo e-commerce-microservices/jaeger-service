@@ -40,7 +40,7 @@ data:
         traces:
           receivers: [otlp]
           processors: [batch]
-          exporters: [logging, jaeger, otlp/aspecto]
+          exporters: [jaeger]
 ---
 apiVersion: v1
 kind: Service
@@ -106,10 +106,10 @@ spec:
           resources:
             limits:
               cpu: "1"
-              memory: 2Gi
+              memory: 128Mi
             requests:
               cpu: 200m
-              memory: 400Mi
+              memory: 128Mi
           ports:
             - containerPort: 4317 #otlp grpc
             - containerPort: 4318 # otlp http
@@ -152,6 +152,10 @@ spec:
             - containerPort: 16686
             - containerPort: 14250
             - containerPort: 14268
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
@@ -175,7 +179,26 @@ spec:
       port: 16686
       protocol: TCP
       targetPort: 16686
-      nodePort: 30100
+      nodePort: 30200
   selector:
     app: opentelemetry
     component: otel-collector
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: jaeger-all-in-one
+#   labels:
+#     app: opentelemetry
+#     component: otel-collector
+# spec:
+#   type: NodePort
+#   ports:
+#     - name: jaeger
+#       port: 16686
+#       protocol: TCP
+#       targetPort: 16686
+#       nodePort: 30200
+#   selector:
+#     app: opentelemetry
+#     component: otel-collector

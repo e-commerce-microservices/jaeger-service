@@ -55,7 +55,7 @@ func jaegerTraceProvider() (*sdktrace.TracerProvider, error) {
 		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("todo-service"),
+			semconv.ServiceNameKey.String("order-service"),
 			attribute.String("environment", "development"),
 		)),
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(1.0)),
